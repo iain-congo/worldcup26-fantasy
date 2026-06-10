@@ -71,15 +71,23 @@ export default async function handler(req, res) {
       }))
       .filter(f => ['FT', 'AET', 'PEN'].includes(f.status) && f.date <= today && f.gameweek)
 
+    const currentSheet = await fetchSheet()
+    const managers = [...new Set(currentSheet.map(p => p.manager))]
+
     if (finishedFixtures.length === 0) {
-      return res.json({ managers: [], currentGW: 1 })
+      const ranked = managers.map((name, i) => ({
+        name,
+        totalPoints: 0,
+        gwPoints: 0,
+        squad: currentSheet.filter(p => p.manager === name),
+        rank: i + 1,
+        rankMovement: 0,
+      }))
+      return res.json({ managers: ranked, currentGW: 1 })
     }
 
     const gwsWithMatches = [...new Set(finishedFixtures.map(f => f.gameweek))]
     const currentGW = Math.max(...gwsWithMatches)
-
-    const currentSheet = await fetchSheet()
-    const managers = [...new Set(currentSheet.map(p => p.manager))]
 
     // Group fixtures by GW
     const fixturesByGW = {}
