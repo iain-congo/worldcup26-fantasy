@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { GAMEWEEKS } from '../lib/scoring.js'
-import { fetchAdminData, lockSnapshot, saveOverride, refreshStats, refreshFixtures } from '../lib/api.js'
+import { fetchAdminData, lockSnapshot, deleteSnapshot, saveOverride, refreshStats, refreshFixtures } from '../lib/api.js'
 
 // ── Password Gate ────────────────────────────────────────────────────────────
 function PasswordGate({ onAuth }) {
@@ -40,7 +40,9 @@ function PasswordGate({ onAuth }) {
 // ── Section 1: Snapshot Manager ──────────────────────────────────────────────
 function SnapshotManager({ password, adminData, onRefresh }) {
   const [locking, setLocking] = useState(null)
+  const [deleting, setDeleting] = useState(null)
   const [confirm, setConfirm] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
   const [expanded, setExpanded] = useState({})
   const [msg, setMsg] = useState('')
 
@@ -57,6 +59,21 @@ function SnapshotManager({ password, adminData, onRefresh }) {
     } finally {
       setLocking(null)
       setConfirm(null)
+    }
+  }
+
+  const doDelete = async gw => {
+    setDeleting(gw)
+    setMsg('')
+    try {
+      const res = await deleteSnapshot(gw, password)
+      if (!res.ok) setMsg(`Failed to delete GW${gw}: HTTP ${res.status}`)
+      else { setMsg(`🗑 GW${gw} snapshot deleted — you can now re-lock.`); onRefresh() }
+    } catch (e) {
+      setMsg(`Error: ${e.message}`)
+    } finally {
+      setDeleting(null)
+      setConfirmDelete(null)
     }
   }
 
@@ -117,12 +134,36 @@ function SnapshotManager({ password, adminData, onRefresh }) {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {locked && (
-                    <button
-                      onClick={() => setExpanded(e => ({ ...e, [g.gw]: !e[g.gw] }))}
-                      className="btn-ghost text-xs py-1"
-                    >
-                      {expanded[g.gw] ? 'Collapse' : 'View'}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => setExpanded(e => ({ ...e, [g.gw]: !e[g.gw] }))}
+                        className="btn-ghost text-xs py-1"
+                      >
+                        {expanded[g.gw] ? 'Collapse' : 'View'}
+                      </button>
+                      {confirmDelete === g.gw ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-red-300">Delete snapshot?</span>
+                          <button
+                            onClick={() => doDelete(g.gw)}
+                            disabled={deleting === g.gw}
+                            className="btn-danger text-xs py-1 px-3"
+                          >
+                            {deleting === g.gw ? 'Deleting…' : 'Confirm'}
+                          </button>
+                          <button onClick={() => setConfirmDelete(null)} className="btn-ghost text-xs py-1 px-3">
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDelete(g.gw)}
+                          className="btn-danger text-xs py-1 px-3"
+                        >
+                          Delete & Re-lock
+                        </button>
+                      )}
+                    </>
                   )}
                   {!locked && (
                     confirm === g.gw ? (

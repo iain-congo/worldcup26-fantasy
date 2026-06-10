@@ -50,6 +50,13 @@ export async function refreshStats(password) {
   })
 }
 
+export async function deleteSnapshot(gw, password) {
+  return fetch(`/api/snapshot?gw=${gw}`, {
+    method: 'DELETE',
+    headers: { 'x-admin-password': password },
+  })
+}
+
 export async function refreshFixtures(password) {
   return fetch('/api/admin/refresh-fixtures', {
     method: 'POST',

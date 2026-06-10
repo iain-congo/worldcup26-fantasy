@@ -74,5 +74,17 @@ export default async function handler(req, res) {
     }
   }
 
+  if (req.method === 'DELETE') {
+    if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+    try {
+      await kv.del(key)
+      return res.json({ ok: true })
+    } catch (e) {
+      return res.status(500).json({ error: e.message })
+    }
+  }
+
   res.status(405).json({ error: 'Method not allowed' })
 }
