@@ -81,8 +81,19 @@ export async function computePlayerPoints(kv, squadPlayer, fixtures, overrides) 
       continue
     }
 
-    const apiNames = statsData.players.map(p => p.name)
-    const matched = matchPlayerName(squadPlayer.player, apiNames, overrides)
+    // Step 1: filter to player's own nation
+    const nationPool = statsData.players.filter(p => p.team === squadPlayer.nation)
+    const basePool = nationPool.length > 0 ? nationPool : statsData.players
+
+    // Step 2: within nation pool, prefer same position
+    const POS_VALUES = { GK: ['G', 'Goalkeeper'], DEF: ['D', 'Defender'], MID: ['M', 'Midfielder'], FWD: ['F', 'Attacker', 'Forward'] }
+    const posValues = POS_VALUES[squadPlayer.position] || []
+    const posPool = posValues.length ? basePool.filter(p => posValues.includes(p.api_position)) : []
+
+    // Step 3: try position-filtered names first, fall back to full nation pool
+    const matched =
+      (posPool.length > 0 && matchPlayerName(squadPlayer.player, posPool.map(p => p.name), overrides)) ||
+      matchPlayerName(squadPlayer.player, basePool.map(p => p.name), overrides)
 
     if (!matched) {
       unmatched = true
