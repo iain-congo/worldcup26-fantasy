@@ -17,6 +17,9 @@ async function apiFetch(path, kv) {
   }
 
   const json = await res.json()
+  if (json.errors && Object.keys(json.errors).length > 0) {
+    throw new Error(`API-Football error: ${JSON.stringify(json.errors)}`)
+  }
   return json.response
 }
 
