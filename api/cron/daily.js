@@ -96,7 +96,7 @@ export default async function handler(req, res) {
               yellow_cards: cards.yellow || 0,
               red_cards: cards.red || 0,
               saves: goals.saves || 0,
-              goals_conceded: goals.conceded ?? null,
+              goals_conceded: goals.conceded || 0,
               own_goals: ownGoalsByPlayer[name] || 0,
             })
           }
