@@ -22,9 +22,9 @@ export function normalize(name) {
   return name
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')   // remove diacritics
-    .replace(/[-']/g, ' ')             // hyphens/apostrophes → space
-    .replace(/[^\w\s]/g, '')           // remove other punctuation
+    .replace(/[̀-ͯ]/g, '')    // remove diacritics
+    .replace(/[-']/g, ' ')              // hyphens/apostrophes → space
+    .replace(/[^\w\s]/g, '')            // remove other punctuation
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -43,27 +43,66 @@ function levenshtein(a, b) {
   return dp[m][n]
 }
 
-// Match a sheet player name against an array of API player names
+const POS_MAP = { G: 'GK', D: 'DEF', M: 'MID', F: 'FWD' }
+
+// Match a sheet player against an array of API player objects { name, team, api_position }
+// squadNation and squadPosition are used to restrict the initial+surname fallback
 // extraOverrides: { sheetName: apiName } from KV
-export function matchPlayerName(sheetName, apiNames, extraOverrides = {}) {
+export function matchPlayerName(sheetName, apiPlayers, extraOverrides = {}, squadNation = null, squadPosition = null) {
   const norm = normalize(sheetName)
+
+  // Support both plain name strings and full player objects
+  const toName = p => (typeof p === 'string' ? p : p.name)
 
   // Check overrides first (extra overrides take priority over built-ins)
   const allOverrides = { ...BUILT_IN_OVERRIDES, ...extraOverrides }
   const overrideKey = Object.keys(allOverrides).find(k => normalize(k) === norm)
   const canonical = overrideKey ? normalize(allOverrides[overrideKey]) : norm
 
-  for (const apiName of apiNames) {
-    const apiNorm = normalize(apiName)
+  for (const p of apiPlayers) {
+    const apiNorm = normalize(toName(p))
 
     // 1. Exact match
-    if (apiNorm === canonical) return apiName
+    if (apiNorm === canonical) return toName(p)
 
     // 2. One contains the other
-    if (apiNorm.includes(canonical) || canonical.includes(apiNorm)) return apiName
+    if (apiNorm.includes(canonical) || canonical.includes(apiNorm)) return toName(p)
 
-    // 3. Levenshtein <= 2 (only for short-ish names to avoid false positives)
-    if (canonical.length >= 4 && levenshtein(apiNorm, canonical) <= 2) return apiName
+    // 3. Levenshtein <= 2
+    if (canonical.length >= 4 && levenshtein(apiNorm, canonical) <= 2) return toName(p)
+  }
+
+  // 4. Initial + surname match (e.g. "F. Wirtz" → "Florian Wirtz")
+  //    Restricted to same team and position to avoid wrong-player matches
+  const initialMatch = norm.match(/^([a-z])\s+(\S+.*)$/)
+  if (initialMatch) {
+    const [, initial, surname] = initialMatch
+    const normSurname = normalize(surname)
+
+    const candidates = apiPlayers.filter(p => {
+      if (typeof p === 'string') return false
+      const parts = normalize(p.name).split(' ')
+      if (parts.length < 2) return false
+
+      const firstInitial = parts[0][0]
+      const lastWord = parts[parts.length - 1]
+
+      if (firstInitial !== initial) return false
+      if (lastWord !== normSurname) return false
+
+      // Must be same team
+      if (squadNation && p.team && normalize(p.team) !== normalize(squadNation)) return false
+
+      // Must be same position
+      if (squadPosition && p.api_position) {
+        const apiPos = POS_MAP[(p.api_position || '').toUpperCase()]
+        if (apiPos && apiPos !== squadPosition) return false
+      }
+
+      return true
+    })
+
+    if (candidates.length === 1) return candidates[0].name
   }
 
   return null

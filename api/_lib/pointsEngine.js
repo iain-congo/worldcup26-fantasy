@@ -54,12 +54,19 @@ async function fetchAndCacheStats(kv, fixtureId) {
   return result
 }
 
-// Enrich a raw stats player with clean_sheet based on fixture status
-function enrichPlayer(p, fixtureStatus) {
+// Enrich a raw stats player with clean_sheet based on match score
+// goals_conceded from the API is only reliable for GKs; use scoreline for everyone
+function enrichPlayer(p, fixtureStatus, fixture) {
   const et = wentToExtraTime(fixtureStatus)
   const threshold = fullMatchThreshold(et)
   const playedFull = (p.minutes || 0) >= threshold
-  const cleanSheet = playedFull && p.goals_conceded === 0
+
+  let conceded = null
+  if (fixture) {
+    if (p.team === fixture.home_team) conceded = fixture.away_score
+    else if (p.team === fixture.away_team) conceded = fixture.home_score
+  }
+  const cleanSheet = playedFull && conceded === 0
   return { ...p, went_to_et: et, clean_sheet: cleanSheet }
 }
 
@@ -81,19 +88,7 @@ export async function computePlayerPoints(kv, squadPlayer, fixtures, overrides) 
       continue
     }
 
-    // Step 1: filter to player's own nation
-    const nationPool = statsData.players.filter(p => p.team === squadPlayer.nation)
-    const basePool = nationPool.length > 0 ? nationPool : statsData.players
-
-    // Step 2: within nation pool, prefer same position
-    const POS_VALUES = { GK: ['G', 'Goalkeeper'], DEF: ['D', 'Defender'], MID: ['M', 'Midfielder'], FWD: ['F', 'Attacker', 'Forward'] }
-    const posValues = POS_VALUES[squadPlayer.position] || []
-    const posPool = posValues.length ? basePool.filter(p => posValues.includes(p.api_position)) : []
-
-    // Step 3: try position-filtered names first, fall back to full nation pool
-    const matched =
-      (posPool.length > 0 && matchPlayerName(squadPlayer.player, posPool.map(p => p.name), overrides)) ||
-      matchPlayerName(squadPlayer.player, basePool.map(p => p.name), overrides)
+    const matched = matchPlayerName(squadPlayer.player, statsData.players, overrides, squadPlayer.nation, squadPlayer.position)
 
     if (!matched) {
       unmatched = true
@@ -112,7 +107,7 @@ export async function computePlayerPoints(kv, squadPlayer, fixtures, overrides) 
     }
 
     const raw = statsData.players.find(p => p.name === matched)
-    const enriched = enrichPlayer(raw, status)
+    const enriched = enrichPlayer(raw, status, fixture)
 
     // Determine position for scoring: sheet position is primary
     const position = squadPlayer.position || mapPosition(enriched.api_position) || 'MID'
