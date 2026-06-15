@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { getFlag } from '../lib/flags.js'
 import { calculatePoints } from '../lib/scoring.js'
 
@@ -49,13 +49,26 @@ function fmtScore(ms) {
 
 function PointsTooltip({ points, matchStats, position }) {
   const [visible, setVisible] = useState(false)
+  const [above, setAbove] = useState(true)
+  const anchorRef = useRef(null)
   const breakdown = buildBreakdown(matchStats, position)
 
+  const handleEnter = () => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect()
+      // Tooltip ~120px tall; show above unless insufficient space
+      setAbove(rect.top > 140)
+    }
+    setVisible(true)
+  }
+
   return (
-    <span className="relative inline-block" onMouseEnter={() => setVisible(true)} onMouseLeave={() => setVisible(false)}>
+    <span ref={anchorRef} className="relative inline-block" onMouseEnter={handleEnter} onMouseLeave={() => setVisible(false)}>
       <span className="cursor-help border-b border-dashed border-gold-500/40">{points}</span>
       {visible && breakdown.length > 0 && (
-        <div className="absolute z-50 bottom-full mb-1 right-0 bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 shadow-xl w-44 text-left">
+        <div className={`absolute z-50 right-0 bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 shadow-xl w-44 text-left ${
+          above ? 'bottom-full mb-1' : 'top-full mt-1'
+        }`}>
           {breakdown.map((line, i) => (
             <div key={i} className={`text-xs font-normal whitespace-nowrap ${line.startsWith('-') ? 'text-red-400' : 'text-gray-200'}`}>
               {line}
