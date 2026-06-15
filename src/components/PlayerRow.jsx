@@ -48,27 +48,29 @@ function fmtScore(ms) {
 }
 
 function PointsTooltip({ points, matchStats, position }) {
-  const [visible, setVisible] = useState(false)
-  const [above, setAbove] = useState(true)
+  const [tooltip, setTooltip] = useState(null)
   const anchorRef = useRef(null)
   const breakdown = buildBreakdown(matchStats, position)
 
   const handleEnter = () => {
-    if (anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect()
-      // Tooltip ~120px tall; show above unless insufficient space
-      setAbove(rect.top > 140)
-    }
-    setVisible(true)
+    if (!anchorRef.current || !breakdown.length) return
+    const rect = anchorRef.current.getBoundingClientRect()
+    const tooltipHeight = 28 + breakdown.length * 20
+    const tooltipWidth = 176
+    const above = rect.top > tooltipHeight + 8
+    const left = Math.max(8, Math.min(rect.right - tooltipWidth, window.innerWidth - tooltipWidth - 8))
+    const top = above ? rect.top - tooltipHeight - 6 : rect.bottom + 6
+    setTooltip({ top, left })
   }
 
   return (
-    <span ref={anchorRef} className="relative inline-block" onMouseEnter={handleEnter} onMouseLeave={() => setVisible(false)}>
+    <span ref={anchorRef} className="relative inline-block" onMouseEnter={handleEnter} onMouseLeave={() => setTooltip(null)}>
       <span className="cursor-help border-b border-dashed border-gold-500/40">{points}</span>
-      {visible && breakdown.length > 0 && (
-        <div className={`absolute z-50 right-0 bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 shadow-xl w-44 text-left ${
-          above ? 'bottom-full mb-1' : 'top-full mt-1'
-        }`}>
+      {tooltip && breakdown.length > 0 && (
+        <div
+          className="fixed z-50 bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 shadow-xl w-44 text-left pointer-events-none"
+          style={{ top: tooltip.top, left: tooltip.left }}
+        >
           {breakdown.map((line, i) => (
             <div key={i} className={`text-xs font-normal whitespace-nowrap ${line.startsWith('-') ? 'text-red-400' : 'text-gray-200'}`}>
               {line}
