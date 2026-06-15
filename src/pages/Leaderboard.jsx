@@ -11,10 +11,12 @@ function RankArrow({ movement }) {
   return <span className="text-gray-600 text-xs">—</span>
 }
 
-function SquadTooltip({ squad, visible }) {
+function SquadTooltip({ squad, visible, above }) {
   if (!visible || !squad?.length) return null
   return (
-    <div className="absolute z-50 left-0 top-full mt-1 bg-dark-700 border border-dark-500 rounded-lg p-3 w-56 shadow-xl">
+    <div className={`absolute z-50 left-0 w-56 bg-dark-700 border border-dark-500 rounded-lg p-3 shadow-xl ${
+      above ? 'bottom-full mb-1' : 'top-full mt-1'
+    }`}>
       <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Current Squad</p>
       <ul className="space-y-1">
         {squad.map((p, i) => (
@@ -35,10 +37,17 @@ function SquadTooltip({ squad, visible }) {
 
 function ManagerRow({ mgr, idx }) {
   const [hovered, setHovered] = useState(false)
+  const [above, setAbove] = useState(false)
   const timerRef = useRef(null)
+  const anchorRef = useRef(null)
 
   const handleEnter = () => {
     clearTimeout(timerRef.current)
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect()
+      // Tooltip is roughly 220px tall; flip above if not enough space below
+      setAbove(rect.bottom + 220 > window.innerHeight)
+    }
     setHovered(true)
   }
   const handleLeave = () => {
@@ -53,14 +62,14 @@ function ManagerRow({ mgr, idx }) {
         )}
       </td>
       <td className="px-4 py-4">
-        <div className="relative inline-block" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+        <div ref={anchorRef} className="relative inline-block" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
           <Link
             to={`/manager/${encodeURIComponent(mgr.name)}`}
             className={`font-semibold hover:underline ${idx === 0 ? 'text-gold-500' : 'text-white'}`}
           >
             {mgr.name}
           </Link>
-          <SquadTooltip squad={mgr.squad} visible={hovered} />
+          <SquadTooltip squad={mgr.squad} visible={hovered} above={above} />
         </div>
       </td>
       <td className="px-4 py-4 text-center text-gray-300 hidden sm:table-cell">
