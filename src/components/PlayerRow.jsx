@@ -2,6 +2,39 @@ import { useState } from 'react'
 import { getFlag } from '../lib/flags.js'
 import { calculatePoints } from '../lib/scoring.js'
 
+function buildBreakdown(matchStats, position) {
+  const lines = []
+  let totalMins = 0, totalGoals = 0, totalAssists = 0, totalRC = 0, totalOG = 0
+  let hasCS = false
+
+  for (const ms of matchStats) {
+    if (ms.unmatched) continue
+    totalMins += ms.minutes || 0
+    totalGoals += ms.goals || 0
+    totalAssists += ms.assists || 0
+    totalRC += ms.red_cards || 0
+    totalOG += ms.own_goals || 0
+    if (ms.clean_sheet) hasCS = true
+  }
+
+  if (totalMins >= 60) lines.push(`+2 played 60+ mins`)
+  else if (totalMins > 0) lines.push(`+1 played ${totalMins} mins`)
+
+  if (totalGoals > 0) {
+    const gPts = position === 'GK' || position === 'DEF' ? 6 : 5
+    lines.push(`+${totalGoals * gPts} goal${totalGoals > 1 ? 's' : ''} (${totalGoals}×${gPts})`)
+  }
+  if (totalAssists > 0) lines.push(`+${totalAssists * 3} assist${totalAssists > 1 ? 's' : ''} (${totalAssists}×3)`)
+  if (hasCS) {
+    const csPts = position === 'GK' ? 6 : 4
+    lines.push(`+${csPts} clean sheet`)
+  }
+  if (totalRC > 0) lines.push(`${totalRC * -2} red card`)
+  if (totalOG > 0) lines.push(`${totalOG * -2} own goal`)
+
+  return lines
+}
+
 const POS_COLORS = {
   GK:  'bg-yellow-500/20 text-yellow-400',
   DEF: 'bg-blue-500/20 text-blue-400',
@@ -12,6 +45,29 @@ const POS_COLORS = {
 function fmtScore(ms) {
   if (ms.home_score == null) return '—'
   return `${ms.home_score}–${ms.away_score}`
+}
+
+function PointsTooltip({ points, matchStats, position }) {
+  const [visible, setVisible] = useState(false)
+  const breakdown = buildBreakdown(matchStats, position)
+
+  return (
+    <span className="relative inline-block" onMouseEnter={() => setVisible(true)} onMouseLeave={() => setVisible(false)}>
+      <span className="cursor-help border-b border-dashed border-gold-500/40">{points}</span>
+      {visible && breakdown.length > 0 && (
+        <div className="absolute z-50 bottom-full mb-1 right-0 bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 shadow-xl w-44 text-left">
+          {breakdown.map((line, i) => (
+            <div key={i} className={`text-xs font-normal whitespace-nowrap ${line.startsWith('-') ? 'text-red-400' : 'text-gray-200'}`}>
+              {line}
+            </div>
+          ))}
+          <div className="border-t border-dark-500 mt-1.5 pt-1.5 text-xs font-bold text-gold-400">
+            = {points} pts
+          </div>
+        </div>
+      )}
+    </span>
+  )
 }
 
 export default function PlayerRow({ player, matchStats = [], transferred, transferredIn }) {
@@ -73,7 +129,9 @@ export default function PlayerRow({ player, matchStats = [], transferred, transf
         <td className="px-3 py-3 text-center text-sm">{hasMatches ? (totals.red_cards || 0) : '—'}</td>
         <td className="px-3 py-3 text-center text-sm">{hasMatches ? (totals.own_goals || 0) : '—'}</td>
         <td className="px-3 py-3 text-center font-bold text-gold-500">
-          {hasMatches ? totalPts : '—'}
+          {hasMatches ? (
+            <PointsTooltip points={totalPts} matchStats={matchStats} position={player.position} />
+          ) : '—'}
           {canExpand && (
             <span className="ml-1 text-gray-500 text-xs">{expanded ? '▲' : '▼'}</span>
           )}
