@@ -8,5 +8,8 @@
       "path": "/api/cron/daily",
       "schedule": "0 8 * * *"
     }
+  ],
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
