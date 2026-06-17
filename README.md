@@ -190,4 +190,4 @@ Tab: `Players`
 | Red card | −2 |
 | Own goal | −2 |
 
-**Clean sheet**: requires playing full match duration. Full match = 90 mins (FT) or 120 mins (AET/PEN).
+**Clean sheet**: requires playing 60 or more minutes in a match where the player's team concedes 0 goals.

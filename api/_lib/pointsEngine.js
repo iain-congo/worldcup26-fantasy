@@ -54,19 +54,26 @@ async function fetchAndCacheStats(kv, fixtureId) {
   return result
 }
 
-// Enrich a raw stats player with clean_sheet based on match score
-// goals_conceded from the API is only reliable for GKs; use scoreline for everyone
-function enrichPlayer(p, fixtureStatus, fixture) {
+// Enrich a raw stats player with clean_sheet based on goal events
+// Clean sheet awarded if player played 60+ mins and no goals were conceded
+// by their team WHILE they were on the pitch (FPL-style event-based logic)
+function enrichPlayer(p, fixtureStatus, fixture, rawEvents) {
   const et = wentToExtraTime(fixtureStatus)
-  const threshold = fullMatchThreshold(et)
-  const playedFull = (p.minutes || 0) >= threshold
+  const minutesPlayed = p.minutes || 0
 
-  let conceded = null
-  if (fixture) {
-    if (p.team === fixture.home_team) conceded = fixture.away_score
-    else if (p.team === fixture.away_team) conceded = fixture.home_score
-  }
-  const cleanSheet = playedFull && conceded === 0
+  // Count goals conceded by this player's team while they were on the pitch
+  const goalsAgainstWhileOn = (rawEvents || []).filter(ev => {
+    if (ev.type !== 'Goal') return false
+    const goalMin = (ev.time?.elapsed || 0) + (ev.time?.extra || 0)
+    if (goalMin > minutesPlayed) return false // goal scored after player left
+    // Own goal: ev.team is the team of the player who scored it (they conceded)
+    // Normal goal: ev.team is the team who scored (the opponent)
+    return ev.detail === 'Own Goal'
+      ? ev.team?.name === p.team
+      : ev.team?.name !== p.team
+  }).length
+
+  const cleanSheet = minutesPlayed >= 60 && goalsAgainstWhileOn === 0
   return { ...p, went_to_et: et, clean_sheet: cleanSheet }
 }
 
@@ -107,7 +114,7 @@ export async function computePlayerPoints(kv, squadPlayer, fixtures, overrides) 
     }
 
     const raw = statsData.players.find(p => p.name === matched)
-    const enriched = enrichPlayer(raw, status, fixture)
+    const enriched = enrichPlayer(raw, status, fixture, statsData.raw_events)
 
     // Determine position for scoring: sheet position is primary
     const position = squadPlayer.position || mapPosition(enriched.api_position) || 'MID'
