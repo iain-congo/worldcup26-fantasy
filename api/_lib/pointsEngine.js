@@ -57,21 +57,37 @@ async function fetchAndCacheStats(kv, fixtureId) {
 // Enrich a raw stats player with clean_sheet based on goal events
 // Clean sheet awarded if player played 60+ mins and no goals were conceded
 // by their team WHILE they were on the pitch (FPL-style event-based logic)
+//
+// Hybrid approach:
+// - Played full match (90 or 120 mins) → use final scoreline, as stoppage
+//   time goals have elapsed > 90 but player was still on the pitch
+// - Substituted off → use event timestamps vs player minutes
 function enrichPlayer(p, fixtureStatus, fixture, rawEvents) {
   const et = wentToExtraTime(fixtureStatus)
   const minutesPlayed = p.minutes || 0
+  const fullDuration = fullMatchThreshold(et) // 90 or 120
 
-  // Count goals conceded by this player's team while they were on the pitch
-  const goalsAgainstWhileOn = (rawEvents || []).filter(ev => {
-    if (ev.type !== 'Goal') return false
-    const goalMin = (ev.time?.elapsed || 0) + (ev.time?.extra || 0)
-    if (goalMin > minutesPlayed) return false // goal scored after player left
-    // Own goal: ev.team is the team of the player who scored it (they conceded)
-    // Normal goal: ev.team is the team who scored (the opponent)
-    return ev.detail === 'Own Goal'
-      ? ev.team?.name === p.team
-      : ev.team?.name !== p.team
-  }).length
+  let goalsAgainstWhileOn
+
+  if (minutesPlayed >= fullDuration) {
+    // Player was on for the whole match — use final scoreline
+    let conceded = null
+    if (fixture) {
+      if (p.team === fixture.home_team) conceded = fixture.away_score
+      else if (p.team === fixture.away_team) conceded = fixture.home_score
+    }
+    goalsAgainstWhileOn = conceded ?? 1 // default to 1 (no CS) if scoreline unknown
+  } else {
+    // Player was substituted — check goal event times vs minutes on pitch
+    goalsAgainstWhileOn = (rawEvents || []).filter(ev => {
+      if (ev.type !== 'Goal') return false
+      const goalMin = (ev.time?.elapsed || 0) + (ev.time?.extra || 0)
+      if (goalMin > minutesPlayed) return false // goal after player left
+      return ev.detail === 'Own Goal'
+        ? ev.team?.name === p.team
+        : ev.team?.name !== p.team
+    }).length
+  }
 
   const cleanSheet = minutesPlayed >= 60 && goalsAgainstWhileOn === 0
   return { ...p, went_to_et: et, clean_sheet: cleanSheet }
