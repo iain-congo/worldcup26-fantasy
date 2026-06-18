@@ -111,7 +111,16 @@ export async function computePlayerPoints(kv, squadPlayer, fixtures, overrides) 
       continue
     }
 
-    const matched = matchPlayerName(squadPlayer.player, statsData.players, overrides, squadPlayer.nation, squadPlayer.position)
+    // Match by player ID first (exact, no fuzzy matching needed)
+    // Fall back to name matching if no ID is available
+    let matched
+    if (squadPlayer.player_id) {
+      const byId = statsData.players.find(p => p.player_id === squadPlayer.player_id)
+      matched = byId?.name || null
+    }
+    if (!matched) {
+      matched = matchPlayerName(squadPlayer.player, statsData.players, overrides, squadPlayer.nation, squadPlayer.position)
+    }
 
     if (!matched) {
       unmatched = true
