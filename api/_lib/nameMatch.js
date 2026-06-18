@@ -18,6 +18,9 @@ export const BUILT_IN_OVERRIDES = {
   // Nickname-only players that won't match by name logic alone
   "y. bounou":     "bono",
   "bounou":        "bono",
+  // Apostrophe in surname causes normalize mismatch (Oreilly vs O Reilly)
+  "n. oreilly":    "nico o'reilly",
+  "oreilly":       "nico o'reilly",
 }
 
 export function normalize(name) {
