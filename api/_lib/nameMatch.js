@@ -83,7 +83,8 @@ export function matchPlayerName(sheetName, apiPlayers, extraOverrides = {}, squa
     const [, initial, surname] = initialMatch
     const normSurname = normalize(surname)
 
-    const candidates = apiPlayers.filter(p => {
+    // Match by initial + surname + nation (no position filter yet)
+  const candidates = apiPlayers.filter(p => {
       if (typeof p === 'string') return false
       const apiNorm = normalize(p.name)
       const parts = apiNorm.split(' ')
@@ -98,16 +99,23 @@ export function matchPlayerName(sheetName, apiPlayers, extraOverrides = {}, squa
       // Must be same team
       if (squadNation && p.team && normalize(p.team) !== normalize(squadNation)) return false
 
-      // Must be same position
-      if (squadPosition && p.api_position) {
-        const apiPos = POS_MAP[(p.api_position || '').toUpperCase()]
-        if (apiPos && apiPos !== squadPosition) return false
-      }
-
       return true
     })
 
+    // Exactly one match — return it regardless of position
     if (candidates.length === 1) return candidates[0].name
+
+    // Multiple matches — use position as tiebreaker
+    if (candidates.length > 1 && squadPosition) {
+      const posMatch = candidates.filter(p => {
+        if (!p.api_position) return true
+        const apiPos = POS_MAP[(p.api_position || '').toUpperCase()]
+        return !apiPos || apiPos === squadPosition
+      })
+      if (posMatch.length >= 1) return posMatch[0].name
+    }
+
+    if (candidates.length > 1) return candidates[0].name
   }
 
   return null
