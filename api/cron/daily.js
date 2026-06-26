@@ -18,12 +18,13 @@ async function fetchSheet() {
   const [header, ...data] = rows
   if (!header) return []
   const col = n => header.findIndex(h => h.toLowerCase() === n.toLowerCase())
-  const mI = col('Manager'), pI = col('Player'), nI = col('Nation'), posI = col('Position')
+  const mI = col('Manager'), pI = col('Player'), nI = col('Nation'), posI = col('Position'), idI = col('Player ID')
   return data.filter(r => r[mI] && r[pI]).map(r => ({
     manager: r[mI]?.trim(),
     player: r[pI]?.trim(),
     nation: r[nI]?.trim(),
     position: r[posI]?.trim()?.toUpperCase(),
+    player_id: r[idI] ? Number(r[idI]) : null,
   }))
 }
 
