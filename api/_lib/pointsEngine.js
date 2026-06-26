@@ -99,18 +99,8 @@ export async function computePlayerPoints(kv, squadPlayer, fixtures, overrides) 
       : matchPlayerName(squadPlayer.player, statsData.players, overrides, squadPlayer.nation, squadPlayer.position)
 
     if (!matched) {
-      unmatched = true
-      matchStats.push({
-        fixture_id: fixtureId,
-        date: fixture.date,
-        home_team: fixture.home_team,
-        away_team: fixture.away_team,
-        home_score: fixture.home_score,
-        away_score: fixture.away_score,
-        minutes: 0, goals: 0, assists: 0,
-        red_cards: 0, own_goals: 0, clean_sheet: false,
-        saves: 0, points: 0, unmatched: true,
-      })
+      // Player's nation played but player not in fixture stats — they didn't play (not selected, injured, rested)
+      // Skip silently — no points, no unmatched flag
       continue
     }
 
