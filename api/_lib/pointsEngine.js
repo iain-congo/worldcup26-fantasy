@@ -54,19 +54,42 @@ async function fetchAndCacheStats(kv, fixtureId) {
   return result
 }
 
-// Enrich a raw stats player with clean_sheet based on match score
-// goals_conceded from the API is only reliable for GKs; use scoreline for everyone
-function enrichPlayer(p, fixtureStatus, fixture) {
+// Enrich a raw stats player with clean_sheet based on goal events
+// Clean sheet awarded if player played 60+ mins and no goals were conceded
+// by their team WHILE they were on the pitch (FPL-style event-based logic)
+//
+// Hybrid approach:
+// - Played full match (90 or 120 mins) → use final scoreline, as stoppage
+//   time goals have elapsed > 90 but player was still on the pitch
+// - Substituted off → use event timestamps vs player minutes
+function enrichPlayer(p, fixtureStatus, fixture, rawEvents) {
   const et = wentToExtraTime(fixtureStatus)
-  const threshold = fullMatchThreshold(et)
-  const playedFull = (p.minutes || 0) >= threshold
+  const minutesPlayed = p.minutes || 0
+  const fullDuration = fullMatchThreshold(et) // 90 or 120
 
-  let conceded = null
-  if (fixture) {
-    if (p.team === fixture.home_team) conceded = fixture.away_score
-    else if (p.team === fixture.away_team) conceded = fixture.home_score
+  let goalsAgainstWhileOn
+
+  if (minutesPlayed >= fullDuration) {
+    // Player was on for the whole match — use final scoreline
+    let conceded = null
+    if (fixture) {
+      if (p.team === fixture.home_team) conceded = fixture.away_score
+      else if (p.team === fixture.away_team) conceded = fixture.home_score
+    }
+    goalsAgainstWhileOn = conceded ?? 1 // default to 1 (no CS) if scoreline unknown
+  } else {
+    // Player was substituted — check goal event times vs minutes on pitch
+    goalsAgainstWhileOn = (rawEvents || []).filter(ev => {
+      if (ev.type !== 'Goal') return false
+      const goalMin = (ev.time?.elapsed || 0) + (ev.time?.extra || 0)
+      if (goalMin > minutesPlayed) return false // goal after player left
+      return ev.detail === 'Own Goal'
+        ? ev.team?.name === p.team
+        : ev.team?.name !== p.team
+    }).length
   }
-  const cleanSheet = playedFull && conceded === 0
+
+  const cleanSheet = minutesPlayed >= 60 && goalsAgainstWhileOn === 0
   return { ...p, went_to_et: et, clean_sheet: cleanSheet }
 }
 
@@ -88,15 +111,19 @@ export async function computePlayerPoints(kv, squadPlayer, fixtures, overrides) 
       continue
     }
 
-    // If stats returned no players, the fixture data wasn't available — skip silently
+    // If stats returned no players, fixture data wasn't available — skip silently
     if (!statsData.players?.length) continue
 
-    // ID match first (most reliable), fall back to name matching
-    let matchedPlayer = squadPlayer.player_id
-      ? statsData.players.find(p => p.player_id === squadPlayer.player_id)
-      : null
-    const matched = matchedPlayer ? matchedPlayer.name
-      : matchPlayerName(squadPlayer.player, statsData.players, overrides, squadPlayer.nation, squadPlayer.position)
+    // Match by player ID first (exact, no fuzzy matching needed)
+    // Fall back to name matching if no ID is available
+    let matched
+    if (squadPlayer.player_id) {
+      const byId = statsData.players.find(p => p.player_id === squadPlayer.player_id)
+      matched = byId?.name || null
+    }
+    if (!matched) {
+      matched = matchPlayerName(squadPlayer.player, statsData.players, overrides, squadPlayer.nation, squadPlayer.position)
+    }
 
     if (!matched) {
       // Player's nation played but player not in fixture stats — they didn't play (not selected, injured, rested)
@@ -105,7 +132,7 @@ export async function computePlayerPoints(kv, squadPlayer, fixtures, overrides) 
     }
 
     const raw = statsData.players.find(p => p.name === matched)
-    const enriched = enrichPlayer(raw, status, fixture)
+    const enriched = enrichPlayer(raw, status, fixture, statsData.raw_events)
 
     // Determine position for scoring: sheet position is primary
     const position = squadPlayer.position || mapPosition(enriched.api_position) || 'MID'

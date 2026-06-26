@@ -25,7 +25,7 @@ async function fetchSheet() {
     player: r[pI]?.trim(),
     nation: r[nI]?.trim(),
     position: r[posI]?.trim()?.toUpperCase(),
-    player_id: r[idI] ? Number(r[idI]) : null,
+    player_id: idI >= 0 && r[idI] ? Number(r[idI].trim()) : null,
   }))
 }
 

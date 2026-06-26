@@ -190,4 +190,4 @@ Tab: `Players`
 | Red card | −2 |
 | Own goal | −2 |
 
-**Clean sheet**: requires playing full match duration. Full match = 90 mins (FT) or 120 mins (AET/PEN).
+**Clean sheet**: awarded to GK and DEF only. The player must have played 60 or more minutes, and no goals must have been conceded by their team **while they were on the pitch**. This means a defender subbed off at 65 minutes will still earn a clean sheet if the opposition only scores after they have left — and will not earn one if a goal was conceded before the 65 minute mark, even if the final score finishes 0-0 after they leave. Goal timing is determined from match events, not the final scoreline.
