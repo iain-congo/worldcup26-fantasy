@@ -88,6 +88,9 @@ export async function computePlayerPoints(kv, squadPlayer, fixtures, overrides) 
       continue
     }
 
+    // If stats returned no players, the fixture data wasn't available — skip silently
+    if (!statsData.players?.length) continue
+
     // ID match first (most reliable), fall back to name matching
     let matchedPlayer = squadPlayer.player_id
       ? statsData.players.find(p => p.player_id === squadPlayer.player_id)
