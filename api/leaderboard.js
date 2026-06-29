@@ -119,7 +119,7 @@ export default async function handler(req, res) {
 
       for (const manager of managers) {
         const squad = gwSquad.filter(p => p.manager === manager)
-        if (!managerSquads[manager]) managerSquads[manager] = squad
+        managerSquads[manager] = squad
 
         let gwPts = 0
         for (const player of squad) {
