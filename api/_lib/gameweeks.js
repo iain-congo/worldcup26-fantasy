@@ -77,12 +77,9 @@ export function assignGameweek(fixture, nationSchedule) {
   const kgw = roundToKnockoutGW(round)
   if (kgw) return kgw
 
-  // Also check by date range as fallback
-  for (const k of KNOCKOUT_GWS) {
-    if (date >= k.start && date <= k.end) return k.gw
-  }
-
   // Group stage: use home team's nation schedule
+  // (must check before date-range fallback — some GW3 matches fall on June 28
+  //  which overlaps the Round of 32 date range)
   const homeTeam = fixture.teams?.home?.name || fixture.home_team
   if (homeTeam && nationSchedule?.[homeTeam]) {
     const sched = nationSchedule[homeTeam]
